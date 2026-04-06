@@ -50,6 +50,8 @@ def render_voice_audio(
     musicxml_path: Path,
     voice: str,
     output_mp3: Path,
+    output_midi: Path | None = None,
+    output_wav: Path | None = None,
     soundfont_path: Path | None = None,
 ) -> Path:
     _require_binary("fluidsynth")
@@ -67,13 +69,15 @@ def render_voice_audio(
     events = data["events"]
 
     output_mp3.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="synth_render_") as tmpdir:
-        tmp = Path(tmpdir)
-        midi_path = tmp / "voice.mid"
-        wav_path = tmp / "voice.wav"
+    if output_midi:
+        output_midi.parent.mkdir(parents=True, exist_ok=True)
+    if output_wav:
+        output_wav.parent.mkdir(parents=True, exist_ok=True)
 
+    if output_midi and output_wav:
+        midi_path = output_midi
+        wav_path = output_wav
         _events_to_midi(events=events, bpm=bpm, midi_path=midi_path)
-
         subprocess.run(
             [
                 "fluidsynth",
@@ -89,22 +93,60 @@ def render_voice_audio(
             capture_output=True,
             text=True,
         )
+    else:
+        with tempfile.TemporaryDirectory(prefix="synth_render_") as tmpdir:
+            tmp = Path(tmpdir)
+            midi_path = tmp / "voice.mid"
+            wav_path = tmp / "voice.wav"
+            _events_to_midi(events=events, bpm=bpm, midi_path=midi_path)
+            subprocess.run(
+                [
+                    "fluidsynth",
+                    "-ni",
+                    str(sf2),
+                    str(midi_path),
+                    "-F",
+                    str(wav_path),
+                    "-r",
+                    "44100",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(wav_path),
-                "-codec:a",
-                "libmp3lame",
-                "-q:a",
-                "2",
-                str(output_mp3),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(wav_path),
+                    "-codec:a",
+                    "libmp3lame",
+                    "-q:a",
+                    "2",
+                    str(output_mp3),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return output_mp3
 
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(wav_path),
+            "-codec:a",
+            "libmp3lame",
+            "-q:a",
+            "2",
+            str(output_mp3),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     return output_mp3

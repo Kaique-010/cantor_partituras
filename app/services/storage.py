@@ -8,9 +8,12 @@ DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"
 PARSED_DIR = DATA_DIR / "parsed"
 AUDIO_DIR = DATA_DIR / "audio"
+RENDER_DIR = DATA_DIR / "render"
+MIDI_DIR = RENDER_DIR / "midi"
+WAV_DIR = RENDER_DIR / "wav"
 
 
-for folder in (DATA_DIR, UPLOAD_DIR, PARSED_DIR, AUDIO_DIR):
+for folder in (DATA_DIR, UPLOAD_DIR, PARSED_DIR, AUDIO_DIR, RENDER_DIR, MIDI_DIR, WAV_DIR):
     folder.mkdir(parents=True, exist_ok=True)
 
 
@@ -32,3 +35,11 @@ def voice_musicxml_path(score_id: str, voice: str) -> Path:
 
 def voice_audio_path(score_id: str, voice: str) -> Path:
     return AUDIO_DIR / f"{score_id}_{voice}.mp3"
+
+
+def voice_midi_path(score_id: str, voice: str) -> Path:
+    return MIDI_DIR / f"{score_id}_{voice}.mid"
+
+
+def voice_wav_path(score_id: str, voice: str) -> Path:
+    return WAV_DIR / f"{score_id}_{voice}.wav"

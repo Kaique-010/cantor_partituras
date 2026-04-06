@@ -31,7 +31,9 @@ from app.services.storage import (
     parsed_musicxml_path,
     persist_upload,
     voice_audio_path,
+    voice_midi_path,
     voice_musicxml_path,
+    voice_wav_path,
 )
 from app.services.tts import synthesize_voice
 from app.services.synth_renderer import render_voice_audio
@@ -82,7 +84,11 @@ def get_uploaded_file(score_id: str) -> FileResponse:
     elif suffix in (".mid", ".midi"):
         media_type = "audio/midi"
 
-    return FileResponse(path, media_type=media_type, filename=path.name)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Content-Disposition": "inline"},
+    )
 
 
 def _convert_to_musicxml_job(score_id: str) -> None:
@@ -302,11 +308,20 @@ def play_synth(score_id: str, payload: SingRequest) -> SingResponse:
         raise HTTPException(status_code=400, detail="Voz não disponível para esta partitura")
 
     output = voice_audio_path(score_id, payload.voice)
+    output_midi = voice_midi_path(score_id, payload.voice)
+    output_wav = voice_wav_path(score_id, payload.voice)
     normalized_path = Path(score["normalized_musicxml_path"])
     try:
-        render_voice_audio(normalized_path, payload.voice, output)
+        render_voice_audio(normalized_path, payload.voice, output, output_midi=output_midi, output_wav=output_wav)
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        # fallback automático para TTS experimental quando synth não estiver disponível no ambiente
+        bpm, sing_script = build_voice_sing_script(normalized_path, payload.voice)
+        try:
+            synthesize_voice(payload.voice, f"bpm={int(bpm)}; seq={sing_script}", output)
+            audio_url = f"/api/scores/{score_id}/voices/{payload.voice}/audio"
+            return SingResponse(score_id=score_id, voice=payload.voice, audio_url=audio_url, mode="tts")
+        except ValueError:
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     audio_url = f"/api/scores/{score_id}/voices/{payload.voice}/audio"
     return SingResponse(score_id=score_id, voice=payload.voice, audio_url=audio_url, mode="synth")
