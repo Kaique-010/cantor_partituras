@@ -29,8 +29,9 @@ def synthesize_voice(voice: str, notes_description: str, output_path: Path) -> P
 
     prompt = (
         f"{VOICE_PROMPTS[voice]} "
-        f"Cante apenas em 'la', seguindo exatamente o BPM e a sequência em Nota/QL; 'rest' é silêncio. "
-        f"Não pronuncie nomes das notas nem palavras; execute como canto sem fala. "
+        f"Use a sequência em Nota/QL/Letra para cantar. "
+        f"Quando Letra for '_' cante em 'la'. Quando houver sílaba, cante a sílaba normalizada. "
+        f"Respeite BPM, pausas ('rest') e duração de cada nota exatamente. "
         f"Sequência: {notes_description}"
     )
 

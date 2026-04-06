@@ -279,7 +279,13 @@ def get_voice_events(score_id: str, voice: str) -> VoiceNoteEventsResponse:
 
     normalized_path = Path(score["normalized_musicxml_path"])
     data = build_voice_note_events(normalized_path, voice)
-    return VoiceNoteEventsResponse(score_id=score_id, voice=voice, bpm=data["bpm"], events=data["events"])
+    return VoiceNoteEventsResponse(
+        score_id=score_id,
+        voice=voice,
+        bpm=data["bpm"],
+        tempo_changes=data.get("tempo_changes", []),
+        events=data["events"],
+    )
 
 
 @router.get("/{score_id}/voices/{voice}/audio")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import statistics
+import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -107,6 +108,58 @@ def get_tempo_bpm(score: stream.Score) -> float:
         if m.number:
             return float(m.number)
     return 120.0
+
+
+def normalize_lyric(text: str | None) -> str | None:
+    if not text:
+        return None
+    cleaned = text.strip().lower()
+    cleaned = re.sub(r"[_\-]+", "", cleaned)
+    cleaned = re.sub(r"[^\wà-ÿ]+", "", cleaned, flags=re.IGNORECASE)
+    return cleaned or None
+
+
+def build_tempo_changes(score: stream.Score) -> list[dict]:
+    changes: list[dict] = []
+    for start, _end, mark in score.metronomeMarkBoundaries():
+        bpm = float(mark.number or 120.0)
+        changes.append({"offset_ql": float(start), "bpm": bpm})
+    if not changes:
+        changes.append({"offset_ql": 0.0, "bpm": 120.0})
+    # remove duplicates no mesmo offset
+    dedup: dict[float, float] = {}
+    for item in changes:
+        dedup[item["offset_ql"]] = item["bpm"]
+    normalized = [{"offset_ql": off, "bpm": dedup[off]} for off in sorted(dedup.keys())]
+    return normalized
+
+
+def ql_to_seconds(offset_ql: float, tempo_changes: list[dict]) -> float:
+    if offset_ql <= 0:
+        return 0.0
+    sec = 0.0
+    for idx, item in enumerate(tempo_changes):
+        start = float(item["offset_ql"])
+        bpm = float(item["bpm"] or 120.0)
+        end = float(tempo_changes[idx + 1]["offset_ql"]) if idx + 1 < len(tempo_changes) else offset_ql
+        if offset_ql <= start:
+            break
+        seg_end = min(offset_ql, end)
+        if seg_end > start:
+            sec += (seg_end - start) * (60.0 / bpm)
+        if seg_end >= offset_ql:
+            break
+    return sec
+
+
+def bpm_at_offset(offset_ql: float, tempo_changes: list[dict]) -> float:
+    current = float(tempo_changes[0]["bpm"])
+    for item in tempo_changes:
+        if float(item["offset_ql"]) <= offset_ql:
+            current = float(item["bpm"])
+        else:
+            break
+    return current
 
 
 def find_part_for_voice(score: stream.Score, voice: str) -> stream.Part:
@@ -218,21 +271,27 @@ def build_voice_sing_script(musicxml_path: Path, voice: str, max_events: int = 2
         if len(tokens) >= max_events:
             break
         dur = float(el.quarterLength)
+        lyric = None
+        if not getattr(el, "isRest", False) and getattr(el, "lyrics", None):
+            try:
+                lyric = normalize_lyric(el.lyrics[0].text)
+            except Exception:
+                lyric = None
         if el.isRest:
-            tokens.append(f"rest/{dur}")
+            tokens.append(f"rest/{dur}/_")
         elif el.isChord:
             name = ".".join(p.nameWithOctave for p in el.pitches[:4])
-            tokens.append(f"{name}/{dur}")
+            tokens.append(f"{name}/{dur}/{lyric or '_'}")
         else:
-            tokens.append(f"{el.pitch.nameWithOctave}/{dur}")
+            tokens.append(f"{el.pitch.nameWithOctave}/{dur}/{lyric or '_'}")
     return bpm, ", ".join(tokens)
 
 
 def build_voice_note_events(musicxml_path: Path, voice: str, max_events: int = 1000) -> dict:
     score: stream.Score = converter.parse(str(musicxml_path))
     bpm = get_tempo_bpm(score)
+    tempo_changes = build_tempo_changes(score)
     part = find_part_for_voice(score, voice)
-    seconds_per_quarter = 60.0 / bpm
 
     events: list[dict] = []
     for el in part.flatten().notesAndRests:
@@ -240,11 +299,14 @@ def build_voice_note_events(musicxml_path: Path, voice: str, max_events: int = 1
             break
         offset_ql = float(el.offset)
         dur_ql = float(el.quarterLength)
-        t = round(offset_ql * seconds_per_quarter, 4)
-        duration = round(dur_ql * seconds_per_quarter, 4)
+        t = round(ql_to_seconds(offset_ql, tempo_changes), 4)
+        end_t = round(ql_to_seconds(offset_ql + dur_ql, tempo_changes), 4)
+        duration = round(max(0.01, end_t - t), 4)
+        current_bpm = bpm_at_offset(offset_ql, tempo_changes)
 
         midi: list[int] = []
         lyric: str | None = None
+        lyric_normalized: str | None = None
         if el.isRest:
             midi = []
         elif el.isChord:
@@ -255,6 +317,7 @@ def build_voice_note_events(musicxml_path: Path, voice: str, max_events: int = 1
             if getattr(el, "lyrics", None):
                 try:
                     lyric = el.lyrics[0].text
+                    lyric_normalized = normalize_lyric(lyric)
                 except Exception:
                     lyric = None
 
@@ -264,9 +327,11 @@ def build_voice_note_events(musicxml_path: Path, voice: str, max_events: int = 1
                 "duration": duration,
                 "midi": midi,
                 "lyric": lyric,
+                "lyric_normalized": lyric_normalized,
+                "bpm_at_start": current_bpm,
                 "offset_ql": offset_ql,
                 "dur_ql": dur_ql,
             }
         )
 
-    return {"bpm": bpm, "events": events}
+    return {"bpm": bpm, "tempo_changes": tempo_changes, "events": events}

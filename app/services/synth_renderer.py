@@ -19,14 +19,17 @@ def _require_binary(name: str) -> None:
         raise ValueError(f"Binário obrigatório não encontrado: {name}")
 
 
-def _events_to_midi(events: list[dict], bpm: float, midi_path: Path) -> Path:
+def _events_to_midi(events: list[dict], bpm: float, midi_path: Path, tempo_changes: list[dict] | None = None) -> Path:
     ticks_per_beat = 480
     midi = MidiFile(ticks_per_beat=ticks_per_beat)
     track = MidiTrack()
     midi.tracks.append(track)
-    track.append(MetaMessage("set_tempo", tempo=bpm2tempo(bpm), time=0))
+    tempo_events = tempo_changes or [{"offset_ql": 0.0, "bpm": bpm}]
+    queue: list[tuple[int, Message | MetaMessage]] = []
+    for item in tempo_events:
+        tick = int(round(float(item["offset_ql"]) * ticks_per_beat))
+        queue.append((tick, MetaMessage("set_tempo", tempo=bpm2tempo(float(item["bpm"])), time=0)))
 
-    queue: list[tuple[int, Message]] = []
     for event in events:
         start_tick = int(round(float(event["offset_ql"]) * ticks_per_beat))
         dur_tick = max(1, int(round(float(event["dur_ql"]) * ticks_per_beat)))
@@ -34,7 +37,7 @@ def _events_to_midi(events: list[dict], bpm: float, midi_path: Path) -> Path:
             queue.append((start_tick, Message("note_on", note=int(note), velocity=90, time=0)))
             queue.append((start_tick + dur_tick, Message("note_off", note=int(note), velocity=0, time=0)))
 
-    queue.sort(key=lambda x: (x[0], 0 if x[1].type == "note_off" else 1))
+    queue.sort(key=lambda x: (x[0], 0 if x[1].type == "set_tempo" else 1 if x[1].type == "note_off" else 2))
 
     last_tick = 0
     for tick, msg in queue:
@@ -77,7 +80,7 @@ def render_voice_audio(
     if output_midi and output_wav:
         midi_path = output_midi
         wav_path = output_wav
-        _events_to_midi(events=events, bpm=bpm, midi_path=midi_path)
+        _events_to_midi(events=events, bpm=bpm, midi_path=midi_path, tempo_changes=data.get("tempo_changes"))
         subprocess.run(
             [
                 "fluidsynth",
@@ -98,7 +101,7 @@ def render_voice_audio(
             tmp = Path(tmpdir)
             midi_path = tmp / "voice.mid"
             wav_path = tmp / "voice.wav"
-            _events_to_midi(events=events, bpm=bpm, midi_path=midi_path)
+            _events_to_midi(events=events, bpm=bpm, midi_path=midi_path, tempo_changes=data.get("tempo_changes"))
             subprocess.run(
                 [
                     "fluidsynth",

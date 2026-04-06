@@ -40,14 +40,22 @@ class VoiceNoteEvent(BaseModel):
     duration: float
     midi: list[int]
     lyric: str | None = None
+    lyric_normalized: str | None = None
+    bpm_at_start: float
     offset_ql: float
     dur_ql: float
+
+
+class TempoChangeEvent(BaseModel):
+    offset_ql: float
+    bpm: float
 
 
 class VoiceNoteEventsResponse(BaseModel):
     score_id: str
     voice: str = Field(pattern="^(soprano|contralto|tenor|baixo)$")
     bpm: float
+    tempo_changes: list[TempoChangeEvent] = Field(default_factory=list)
     events: list[VoiceNoteEvent]
 
 

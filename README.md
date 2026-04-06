@@ -50,6 +50,7 @@ Acesse: `http://localhost:8090`
 - `POST /api/scores/{score_id}/analyze` → parse + separação SATB
 - `GET /api/scores/{score_id}/voices` → lista vozes disponíveis
 - `GET /api/scores/{score_id}/parts` → análise de partes e classificação de voz
+- `GET /api/scores/{score_id}/voices/{voice}/events` → eventos com tempos por nota (bpm por nota + tempo changes)
 - `POST /api/scores/{score_id}/play-synth` → gera áudio determinístico da voz selecionada
 - `POST /api/scores/{score_id}/sing-tts` → gera áudio por TTS (experimental)
 - `POST /api/scores/{score_id}/sing` → alias legado para `sing-tts`
