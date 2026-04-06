@@ -20,6 +20,7 @@ class SingResponse(BaseModel):
     score_id: str
     voice: str
     audio_url: str
+    mode: str = Field(pattern="^(synth|tts)$")
 
 
 class VoiceTimelineEvent(BaseModel):
@@ -48,3 +49,19 @@ class VoiceNoteEventsResponse(BaseModel):
     voice: str = Field(pattern="^(soprano|contralto|tenor|baixo)$")
     bpm: float
     events: list[VoiceNoteEvent]
+
+
+class PartSummary(BaseModel):
+    part_index: int
+    part_name: str
+    midi_min: int | None = None
+    midi_max: int | None = None
+    midi_median: float | None = None
+    has_lyrics: bool
+    guessed_voice: str
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class PartListResponse(BaseModel):
+    score_id: str
+    parts: list[PartSummary]
