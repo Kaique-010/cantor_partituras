@@ -1,0 +1,8 @@
+/.env
+/.env.test
+*.log
+cache/
+pycache/
+test
+__pycache__/
+.venv

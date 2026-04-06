@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Music Voice Agents</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(255, 255, 255, 0.06);
+      --border: rgba(255, 255, 255, 0.14);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.65);
+      --accent: #7c5cff;
+      --accent-2: #26d7a3;
+      --danger: #ff5c7a;
+      --shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(900px 650px at 18% 12%, rgba(124, 92, 255, 0.24), transparent 60%),
+        radial-gradient(900px 650px at 90% 18%, rgba(38, 215, 163, 0.18), transparent 55%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1220px;
+      padding: 1.25rem;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 0.25rem 1.2rem;
+    }
+
+    .titleWrap h1 {
+      margin: 0;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+      font-size: 1.4rem;
+    }
+
+    .titleWrap p {
+      margin: 0.4rem 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .statusPill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.5rem 0.75rem;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 99px;
+      background: var(--accent-2);
+      box-shadow: 0 0 0 4px rgba(38, 215, 163, 0.12);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .cardHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .cardHeader h3 {
+      margin: 0;
+      font-size: 0.98rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .cardBody {
+      padding: 1rem;
+    }
+
+    .row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .col {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      padding: 0.6rem 0.85rem;
+      border-radius: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btnPrimary {
+      border-color: rgba(124, 92, 255, 0.55);
+      background: linear-gradient(135deg, rgba(124, 92, 255, 0.35), rgba(124, 92, 255, 0.16));
+    }
+
+    .btnDanger {
+      border-color: rgba(255, 92, 122, 0.55);
+      background: linear-gradient(135deg, rgba(255, 92, 122, 0.18), rgba(255, 92, 122, 0.1));
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .field {
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.22);
+      color: var(--text);
+      padding: 0.6rem 0.75rem;
+      border-radius: 12px;
+      outline: none;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    .drop {
+      border: 1px dashed rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 14px;
+      padding: 0.85rem;
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease;
+    }
+
+    .drop:hover {
+      background: rgba(255, 255, 255, 0.055);
+      border-color: rgba(255, 255, 255, 0.32);
+    }
+
+    .dropStrong {
+      border-color: rgba(38, 215, 163, 0.55);
+      background: rgba(38, 215, 163, 0.06);
+    }
+
+    #osmdWrap {
+      position: relative;
+    }
+
+    #filePreview {
+      width: 100%;
+      min-height: 420px;
+      border: 0;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    #osmd {
+      border-radius: 12px;
+      padding: 0.5rem;
+      background: rgba(255, 255, 255, 0.96);
+      overflow-x: auto;
+      min-height: 420px;
+    }
+
+    #osmdEmpty {
+      display: grid;
+      place-items: center;
+      min-height: 420px;
+      color: rgba(0, 0, 0, 0.55);
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 12px;
+      padding: 1.2rem;
+      text-align: center;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 255, 255, 0.92);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      backdrop-filter: blur(6px);
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      border-top-color: rgba(255, 255, 255, 0.92);
+      margin-right: 0.6rem;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .logs {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 480px;
+    }
+
+    #logList {
+      padding: 0.8rem 1rem 1rem;
+      overflow: auto;
+      display: grid;
+      gap: 0.55rem;
+    }
+
+    .logItem {
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 12px;
+      padding: 0.6rem 0.75rem;
+      display: grid;
+      gap: 0.25rem;
+    }
+
+    .logMeta {
+      display: flex;
+      gap: 0.6rem;
+      align-items: baseline;
+    }
+
+    .logTime {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .logTag {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+
+    .tagInfo {
+      color: rgba(38, 215, 163, 0.95);
+    }
+
+    .tagWarn {
+      color: rgba(255, 198, 92, 0.95);
+    }
+
+    .tagErr {
+      color: rgba(255, 92, 122, 0.95);
+    }
+
+    .logMsg {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .playerRow {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    audio {
+      width: 100%;
+    }
+
+    .segmented {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.22);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .segmented button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0.45rem 0.7rem;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .segmented button.active {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .logs {
+        height: 360px;
+      }
+
+      #osmd,
+      #filePreview,
+      #osmdEmpty {
+        min-height: 360px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <header>
+      <div class="titleWrap">
+        <h1>Music Voice Agents</h1>
+        <p>Upload → OCR/OMR (PDF/imagem) → MusicXML → seleção de voz → áudio + cursor sincronizado</p>
+      </div>
+      <div class="statusPill">
+        <span class="dot"></span>
+        <span id="statusText">Pronto</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="cardHeader">
+          <h3>Partitura</h3>
+          <div class="segmented" role="tablist" aria-label="Modo de visualização">
+            <button id="modeFileBtn" class="active" type="button" onclick="setViewMode('file')">Arquivo</button>
+            <button id="modeFullBtn" type="button" onclick="setViewMode('full')">Completa</button>
+            <button id="modeVoiceBtn" type="button" onclick="setViewMode('voice')">Voz</button>
+          </div>
+        </div>
+        <div class="cardBody">
+          <div id="osmdWrap">
+            <div id="osmdEmpty">
+              <div>
+                <div style="font-weight: 780; font-size: 1.05rem; margin-bottom: 0.4rem;">Envie uma partitura</div>
+                <div style="max-width: 520px; margin: 0 auto;">Suporta MusicXML/MIDI. Para PDF/imagem, usa OCR/OMR via
+                  OpenAI (com OPENAI_API_KEY).</div>
+              </div>
+            </div>
+            <iframe id="filePreview" style="display:none;" title="Arquivo enviado"></iframe>
+            <div id="osmd" style="display:none;"></div>
+            <div id="viewerOverlay" class="overlay"><span class="spinner"></span><span
+                id="viewerOverlayText">Carregando…</span></div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="col">
+        <section class="card">
+          <div class="cardHeader">
+            <h3>Controles</h3>
+            <div class="muted mono">score_id: <span id="scoreId">-</span></div>
+          </div>
+          <div class="cardBody col">
+            <div class="field">
+              <label>Arquivo</label>
+              <div id="dropZone" class="drop" tabindex="0">
+                <div style="font-weight: 750;">Arraste e solte aqui</div>
+                <div class="muted" style="margin-top: 0.25rem;">ou clique para selecionar (PDF, imagem, MusicXML, MIDI)
+                </div>
+                <div class="muted" id="fileMeta" style="margin-top: 0.6rem;">Nenhum arquivo selecionado</div>
+              </div>
+              <input id="scoreFile" type="file" style="display:none;" />
+            </div>
+
+            <div class="row">
+              <button id="uploadBtn" class="btn btnPrimary" type="button" onclick="uploadScore()">Upload</button>
+              <button id="analyzeBtn" class="btn" type="button" onclick="analyzeScore()" disabled>Analisar
+                vozes</button>
+              <button id="playNotesBtn" class="btn" type="button" onclick="playNotes()" disabled>Tocar notas</button>
+              <button id="singBtn" class="btn" type="button" onclick="singVoice()" disabled>Gerar voz (TTS)</button>
+            </div>
+
+            <div class="field">
+              <label>Voz</label>
+              <select id="voiceSelect" class="select" disabled></select>
+              <div class="muted" id="voicesInfo">-</div>
+            </div>
+
+            <div class="playerRow">
+              <audio id="audioPlayer" controls></audio>
+              <div class="muted mono" id="audioPath">Áudio: -</div>
+              <div class="muted" id="lyricNow">Letra: -</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card logs">
+          <div class="cardHeader">
+            <h3>Logs</h3>
+            <div class="row">
+              <button class="btn" type="button" onclick="copyLogs()">Copiar</button>
+              <button class="btn btnDanger" type="button" onclick="clearLogs()">Limpar</button>
+            </div>
+          </div>
+          <div id="logList"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.1/build/opensheetmusicdisplay.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
+  <script>
+    let scoreId = null;
+    let osmd = null;
+    let timeline = null;
+    let syncTimer = null;
+    let viewMode = 'file';
+    let lastUploadedFile = null;
+    let noteEvents = null;
+    let notesPlaying = false;
+
+    function setStatus(text, kind) {
+      const el = document.getElementById('statusText');
+      el.textContent = text;
+      if (kind === 'err') el.style.color = 'rgba(255, 92, 122, 0.95)';
+      else if (kind === 'warn') el.style.color = 'rgba(255, 198, 92, 0.95)';
+      else el.style.color = 'rgba(255,255,255,0.85)';
+    }
+
+    function log(tag, msg) {
+      const list = document.getElementById('logList');
+      const item = document.createElement('div');
+      item.className = 'logItem';
+
+      const meta = document.createElement('div');
+      meta.className = 'logMeta';
+
+      const time = document.createElement('div');
+      time.className = 'logTime mono';
+      time.textContent = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+
+      const t = document.createElement('div');
+      t.className = 'logTag mono';
+      const tagKey = String(tag || 'INFO').toUpperCase();
+      t.textContent = tagKey;
+      if (tagKey === 'ERRO' || tagKey === 'ERROR') t.classList.add('tagErr');
+      else if (tagKey === 'AVISO' || tagKey === 'WARN') t.classList.add('tagWarn');
+      else t.classList.add('tagInfo');
+
+      const m = document.createElement('div');
+      m.className = 'logMsg';
+      m.textContent = msg;
+
+      meta.appendChild(time);
+      meta.appendChild(t);
+      item.appendChild(meta);
+      item.appendChild(m);
+
+      list.prepend(item);
+    }
+
+    function clearLogs() {
+      document.getElementById('logList').innerHTML = '';
+      log('INFO', 'Logs limpos.');
+    }
+
+    async function copyLogs() {
+      const items = Array.from(document.querySelectorAll('.logItem')).reverse().map((el) => {
+        const time = el.querySelector('.logTime')?.textContent || '';
+        const tag = el.querySelector('.logTag')?.textContent || '';
+        const msg = el.querySelector('.logMsg')?.textContent || '';
+        return `[${time}] ${tag} ${msg}`;
+      }).join('\n');
+      try {
+        await navigator.clipboard.writeText(items);
+        log('INFO', 'Logs copiados para a área de transferência.');
+      } catch (e) {
+        log('AVISO', 'Não foi possível copiar os logs automaticamente.');
+      }
+    }
+
+    function setBusy(isBusy, text) {
+      const overlay = document.getElementById('viewerOverlay');
+      const overlayText = document.getElementById('viewerOverlayText');
+      if (isBusy) {
+        overlayText.textContent = text || 'Carregando…';
+        overlay.classList.add('show');
+      } else {
+        overlay.classList.remove('show');
+      }
+    }
+
+    function setViewMode(mode) {
+      viewMode = (mode === 'voice' || mode === 'full' || mode === 'file') ? mode : 'file';
+      document.getElementById('modeFileBtn').classList.toggle('active', viewMode === 'file');
+      document.getElementById('modeFullBtn').classList.toggle('active', viewMode === 'full');
+      document.getElementById('modeVoiceBtn').classList.toggle('active', viewMode === 'voice');
+      if (!scoreId) return;
+      const voice = document.getElementById('voiceSelect').value;
+      renderCurrentView(voice).catch((e) => log('ERRO', e.message));
+    }
+
+    async function fetchJson(url, opts) {
+      const res = await fetch(url, opts);
+      const data = await res.json().catch(async () => {
+        const text = await res.text().catch(() => '');
+        return { detail: text || 'Erro inesperado' };
+      });
+      if (!res.ok) {
+        const detail = (data && data.detail) ? data.detail : JSON.stringify(data);
+        throw new Error(detail);
+      }
+      return data;
+    }
+
+    async function fetchText(url, opts) {
+      const res = await fetch(url, opts);
+      if (res.status === 202) {
+        const data = await res.json().catch(() => ({}));
+        return { pending: true, data };
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data && data.detail) ? data.detail : 'Falha na requisição');
+      }
+      const text = await res.text();
+      return { pending: false, text };
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    let lastProgressLogAt = 0;
+
+    async function fetchMusicXmlWithPolling(url, timeoutMs = 240000, pollMs = 2500) {
+      const started = Date.now();
+      lastProgressLogAt = 0;
+      log('INFO', 'Iniciando conversão/OCR…');
+      while (true) {
+        const elapsedMs = Date.now() - started;
+        if (elapsedMs > timeoutMs) throw new Error('OCR/OMR demorou demais. Tente reduzir páginas/DPI no .env.');
+
+        const result = await fetchText(url);
+        if (!result.pending) return result.text;
+
+        const elapsedSec = Math.round(elapsedMs / 1000);
+        setBusy(true, `Convertendo via OCR/OMR… (${elapsedSec}s)`);
+        if (Date.now() - lastProgressLogAt > 8000) {
+          lastProgressLogAt = Date.now();
+          log('INFO', `OCR/OMR em andamento… (${elapsedSec}s)`);
+        }
+        await sleep(pollMs);
+      }
+    }
+
+    async function ensureOsmd() {
+      if (osmd) return osmd;
+      osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('osmd', {
+        drawTitle: true,
+        drawSubtitle: false,
+        drawComposer: true,
+        drawLyricist: false,
+        drawingParameters: 'compact',
+      });
+      return osmd;
+    }
+
+    async function renderMusicXML(xmlText) {
+      document.getElementById('osmdEmpty').style.display = 'none';
+      document.getElementById('filePreview').style.display = 'none';
+      document.getElementById('osmd').style.display = 'block';
+      await ensureOsmd();
+      await osmd.load(xmlText);
+      await osmd.render();
+      osmd.cursor.show();
+      osmd.cursor.reset();
+    }
+
+    async function renderCurrentView(voice) {
+      if (!scoreId) return;
+      stopSync();
+      const audioEl = document.getElementById('audioPlayer');
+      audioEl.pause();
+
+      const filename = (lastUploadedFile && lastUploadedFile.name) ? lastUploadedFile.name.toLowerCase() : '';
+      const isPdfOrImage = filename.endsWith('.pdf') || filename.endsWith('.png') || filename.endsWith('.jpg') || filename.endsWith('.jpeg') || filename.endsWith('.webp');
+      const busyText = viewMode === 'voice'
+        ? 'Carregando voz…'
+        : (viewMode === 'full'
+          ? (isPdfOrImage ? 'Convertendo via OCR/OMR (pode demorar)…' : 'Carregando partitura…')
+          : 'Carregando arquivo…');
+      setBusy(true, busyText);
+      try {
+        if (viewMode === 'file') {
+          document.getElementById('osmd').style.display = 'none';
+          document.getElementById('osmdEmpty').style.display = 'none';
+          const iframe = document.getElementById('filePreview');
+          iframe.style.display = 'block';
+          iframe.src = `/api/scores/${scoreId}/upload?v=${Date.now()}`;
+          log('INFO', 'Exibindo arquivo enviado');
+          return;
+        }
+
+        if (viewMode === 'voice') {
+          if (!voice) throw new Error('Selecione uma voz.');
+          const xmlText = await fetchText(`/api/scores/${scoreId}/voices/${voice}/musicxml`);
+          await renderMusicXML(xmlText.text || '');
+          await loadTimeline(voice);
+          log('INFO', `Renderizado: voz ${voice}`);
+        } else {
+          const xmlText = await fetchMusicXmlWithPolling(`/api/scores/${scoreId}/musicxml`);
+          await renderMusicXML(xmlText);
+          timeline = null;
+          log('INFO', 'Renderizado: partitura completa');
+        }
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function loadTimeline(voice) {
+      timeline = await fetchJson(`/api/scores/${scoreId}/voices/${voice}/timeline`);
+      return timeline;
+    }
+
+    function stopSync() {
+      if (syncTimer) {
+        clearInterval(syncTimer);
+        syncTimer = null;
+      }
+    }
+
+    function startSync(audioEl) {
+      stopSync();
+      if (!osmd || !osmd.cursor || !timeline || !timeline.events || timeline.events.length === 0) return;
+
+      osmd.cursor.show();
+      osmd.cursor.reset();
+      let idx = 1;
+
+      syncTimer = setInterval(() => {
+        if (audioEl.paused || audioEl.ended) {
+          stopSync();
+          return;
+        }
+        const t = audioEl.currentTime;
+        while (idx < timeline.events.length && t >= timeline.events[idx].t) {
+          osmd.cursor.next();
+          idx += 1;
+        }
+      }, 50);
+    }
+
+    function setControlsEnabled() {
+      const hasFile = Boolean(lastUploadedFile);
+      const hasScoreId = Boolean(scoreId);
+      const voiceSelect = document.getElementById('voiceSelect');
+      document.getElementById('uploadBtn').disabled = !hasFile;
+      document.getElementById('analyzeBtn').disabled = !hasScoreId;
+      document.getElementById('singBtn').disabled = !hasScoreId || voiceSelect.disabled || !voiceSelect.value;
+      document.getElementById('playNotesBtn').disabled = !hasScoreId || voiceSelect.disabled || !voiceSelect.value || !noteEvents;
+    }
+
+    async function uploadScore() {
+      const file = lastUploadedFile || document.getElementById('scoreFile').files[0];
+      if (!file) return log('AVISO', 'Selecione um arquivo primeiro.');
+
+      setStatus('Enviando arquivo…');
+      log('INFO', `Upload iniciado: ${file.name}`);
+      setBusy(true, 'Enviando…');
+
+      document.getElementById('uploadBtn').disabled = true;
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('singBtn').disabled = true;
+      document.getElementById('voiceSelect').disabled = true;
+      document.getElementById('voiceSelect').innerHTML = '';
+      document.getElementById('voicesInfo').textContent = '-';
+      document.getElementById('audioPlayer').src = '';
+      document.getElementById('audioPath').textContent = 'Áudio: -';
+
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const data = await fetchJson('/api/scores/upload', { method: 'POST', body: fd });
+        scoreId = data.score_id;
+        document.getElementById('scoreId').textContent = scoreId;
+        setStatus('Upload concluído');
+        log('INFO', `score_id: ${scoreId}`);
+        noteEvents = null;
+        document.getElementById('lyricNow').textContent = 'Letra: -';
+        if (file.name.toLowerCase().endsWith('.pdf')) log('INFO', 'PDF detectado: OCR/OMR roda ao analisar ou ao abrir a partitura.');
+        setViewMode('file');
+        await renderCurrentView(document.getElementById('voiceSelect').value);
+        document.getElementById('analyzeBtn').disabled = false;
+        setControlsEnabled();
+      } catch (e) {
+        setStatus('Erro no upload', 'err');
+        log('ERRO', e.message);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function analyzeScore() {
+      if (!scoreId) return log('AVISO', 'Faça o upload antes.');
+      setStatus('Analisando…');
+      setBusy(true, 'Analisando vozes…');
+      log('INFO', 'Análise iniciada');
+
+      let data;
+      try {
+        await fetchMusicXmlWithPolling(`/api/scores/${scoreId}/musicxml`);
+        data = await fetchJson(`/api/scores/${scoreId}/analyze`, { method: 'POST' });
+      } catch (e) {
+        setStatus('Erro na análise', 'err');
+        log('ERRO', e.message);
+        setBusy(false);
+        return;
+      } finally {
+        setBusy(false);
+      }
+
+      setStatus('Análise concluída');
+      const voices = data.voices || [];
+      const select = document.getElementById('voiceSelect');
+      select.innerHTML = '';
+      voices.forEach((voice) => {
+        const opt = document.createElement('option');
+        opt.value = voice;
+        opt.textContent = voice;
+        select.appendChild(opt);
+      });
+
+      select.disabled = voices.length === 0;
+      document.getElementById('voicesInfo').textContent = voices.length ? `Vozes detectadas: ${voices.join(', ')}` : 'Nenhuma voz detectada';
+
+      select.onchange = async () => {
+        const voice = select.value;
+        try {
+          stopSync();
+          document.getElementById('audioPlayer').pause();
+          noteEvents = await fetchJson(`/api/scores/${scoreId}/voices/${voice}/events`);
+          log('INFO', `Eventos de notas carregados: ${noteEvents.events.length}`);
+          document.getElementById('lyricNow').textContent = 'Letra: -';
+          if (viewMode !== 'file') await renderCurrentView(voice);
+          else log('INFO', `Voz selecionada: ${voice}`);
+          setControlsEnabled();
+        } catch (e) {
+          log('ERRO', `Erro ao trocar voz: ${e.message}`);
+        }
+      };
+
+      if (voices.length) {
+        const voice = voices[0];
+        select.value = voice;
+        noteEvents = await fetchJson(`/api/scores/${scoreId}/voices/${voice}/events`);
+        log('INFO', `Eventos de notas carregados: ${noteEvents.events.length}`);
+        document.getElementById('lyricNow').textContent = 'Letra: -';
+        setViewMode('file');
+      }
+
+      setControlsEnabled();
+      log('INFO', `Análise concluída: ${JSON.stringify(data)}`);
+    }
+
+    function stopNotes() {
+      try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+      } catch (e) { }
+      notesPlaying = false;
+      document.getElementById('playNotesBtn').textContent = 'Tocar notas';
+    }
+
+    async function playNotes() {
+      if (!noteEvents || !noteEvents.events || noteEvents.events.length === 0) return;
+      if (notesPlaying) {
+        stopNotes();
+        return;
+      }
+
+      await Tone.start();
+      const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+      Tone.Transport.cancel();
+
+      const bpm = Number(noteEvents.bpm || 120);
+      Tone.Transport.bpm.value = bpm;
+      const lyricEl = document.getElementById('lyricNow');
+
+      for (const ev of noteEvents.events) {
+        const t = Number(ev.t || 0);
+        const dur = Math.max(0.05, Number(ev.duration || 0.2));
+        const mids = Array.isArray(ev.midi) ? ev.midi : [];
+        if (ev.lyric) {
+          Tone.Transport.schedule(() => {
+            lyricEl.textContent = `Letra: ${ev.lyric}`;
+          }, t);
+        }
+        if (!mids.length) continue;
+        Tone.Transport.schedule(() => {
+          for (const m of mids) {
+            const freq = Tone.Frequency(Number(m), 'midi');
+            synth.triggerAttackRelease(freq, dur);
+          }
+        }, t);
+      }
+
+      Tone.Transport.scheduleOnce(() => {
+        stopNotes();
+      }, Math.max(...noteEvents.events.map((e) => Number(e.t || 0) + Number(e.duration || 0))) + 0.25);
+
+      notesPlaying = true;
+      document.getElementById('playNotesBtn').textContent = 'Parar notas';
+      log('INFO', `Reprodução de notas iniciada (BPM ${bpm})`);
+      Tone.Transport.start('+0.05');
+    }
+
+    async function singVoice() {
+      if (!scoreId) return log('AVISO', 'Faça o upload e análise antes.');
+      const voice = document.getElementById('voiceSelect').value;
+      if (!voice) return log('AVISO', 'Selecione uma voz.');
+      try {
+        setStatus('Gerando áudio…');
+        setBusy(true, 'Gerando áudio…');
+        const data = await fetchJson(`/api/scores/${scoreId}/sing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voice }),
+        });
+
+        const audioEl = document.getElementById('audioPlayer');
+        audioEl.src = `${data.audio_url}?v=${Date.now()}`;
+        document.getElementById('audioPath').textContent = `Áudio: ${data.audio_url}`;
+        await loadTimeline(voice);
+
+        audioEl.onplay = () => startSync(audioEl);
+        audioEl.onpause = () => stopSync();
+        audioEl.onended = () => stopSync();
+
+        await audioEl.play();
+        setStatus('Tocando');
+        log('INFO', `Áudio gerado: ${JSON.stringify(data)}`);
+      } catch (e) {
+        setStatus('Erro no áudio', 'err');
+        log('ERRO', `Erro ao gerar áudio: ${e.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function formatBytes(bytes) {
+      const b = Number(bytes || 0);
+      if (!b) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.min(units.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+      return `${(b / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    function setSelectedFile(file) {
+      lastUploadedFile = file || null;
+      const meta = document.getElementById('fileMeta');
+      if (!file) {
+        meta.textContent = 'Nenhum arquivo selecionado';
+        setControlsEnabled();
+        return;
+      }
+      meta.textContent = `${file.name} • ${formatBytes(file.size)}`;
+      setControlsEnabled();
+    }
+
+    function bindDropzone() {
+      const dz = document.getElementById('dropZone');
+      const input = document.getElementById('scoreFile');
+
+      dz.addEventListener('click', () => input.click());
+      dz.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') input.click();
+      });
+      input.addEventListener('change', () => setSelectedFile(input.files[0]));
+
+      dz.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dz.classList.add('dropStrong');
+      });
+      dz.addEventListener('dragleave', () => dz.classList.remove('dropStrong'));
+      dz.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dz.classList.remove('dropStrong');
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) {
+          input.files = e.dataTransfer.files;
+          setSelectedFile(file);
+        }
+      });
+    }
+
+    function init() {
+      bindDropzone();
+      clearLogs();
+      setControlsEnabled();
+      setStatus('Pronto');
+    }
+
+    init();
+  </script>
+</body>
+
+</html>
