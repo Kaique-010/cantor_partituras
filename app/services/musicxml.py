@@ -12,6 +12,18 @@ from app.services.ocr import omr_to_musicxml
 SATB = ["soprano", "contralto", "tenor", "baixo"]
 
 
+def _guess_voice_from_median(midi_median: float | None) -> tuple[str, float]:
+    if midi_median is None:
+        return "tenor", 0.2
+    if midi_median >= 69:
+        return "soprano", 0.85
+    if midi_median >= 62:
+        return "contralto", 0.75
+    if midi_median >= 55:
+        return "tenor", 0.75
+    return "baixo", 0.85
+
+
 def normalize_to_musicxml(input_path: Path, output_path: Path) -> Path:
     """Converte o arquivo de entrada para MusicXML normalizado."""
     suffix = input_path.suffix.lower()
@@ -30,22 +42,63 @@ def normalize_to_musicxml(input_path: Path, output_path: Path) -> Path:
 
 def infer_satb_voices(musicxml_path: Path) -> list[str]:
     """Heurística inicial: tenta mapear partes para SATB; fallback em todas as vozes."""
-    score: stream.Score = converter.parse(str(musicxml_path))
-    names: list[str] = []
-
-    for part in score.parts:
-        part_name = (part.partName or "").lower()
-        if "sopr" in part_name:
-            names.append("soprano")
-        elif "alto" in part_name or "contr" in part_name:
-            names.append("contralto")
-        elif "tenor" in part_name:
-            names.append("tenor")
-        elif "bass" in part_name or "baixo" in part_name:
-            names.append("baixo")
+    names = [item["guessed_voice"] for item in analyze_parts(musicxml_path)]
 
     unique = sorted(set(names))
     return unique or SATB.copy()
+
+
+def analyze_parts(score: stream.Score | Path | str) -> list[dict]:
+    parsed_score: stream.Score
+    if isinstance(score, stream.Score):
+        parsed_score = score
+    else:
+        parsed_score = converter.parse(str(score))
+
+    parts_summary: list[dict] = []
+    for idx, part in enumerate(parsed_score.parts):
+        part_name = (part.partName or f"Part {idx + 1}").strip()
+        part_name_low = part_name.lower()
+
+        midis: list[int] = []
+        has_lyrics = False
+        for el in part.flatten().notesAndRests:
+            if getattr(el, "isRest", False):
+                continue
+            if getattr(el, "isChord", False):
+                midis.extend(int(p.midi) for p in el.pitches)
+            else:
+                midis.append(int(el.pitch.midi))
+                if getattr(el, "lyrics", None):
+                    has_lyrics = True
+
+        midi_min = min(midis) if midis else None
+        midi_max = max(midis) if midis else None
+        midi_median = float(statistics.median(midis)) if midis else None
+        guessed_voice, confidence = _guess_voice_from_median(midi_median)
+
+        if "sopr" in part_name_low:
+            guessed_voice, confidence = "soprano", 0.95
+        elif "alto" in part_name_low or "contr" in part_name_low:
+            guessed_voice, confidence = "contralto", 0.95
+        elif "tenor" in part_name_low:
+            guessed_voice, confidence = "tenor", 0.95
+        elif "bass" in part_name_low or "baixo" in part_name_low:
+            guessed_voice, confidence = "baixo", 0.95
+
+        parts_summary.append(
+            {
+                "part_index": idx,
+                "part_name": part_name,
+                "midi_min": midi_min,
+                "midi_max": midi_max,
+                "midi_median": midi_median,
+                "has_lyrics": has_lyrics,
+                "guessed_voice": guessed_voice,
+                "confidence": confidence,
+            }
+        )
+    return parts_summary
 
 
 def get_tempo_bpm(score: stream.Score) -> float:

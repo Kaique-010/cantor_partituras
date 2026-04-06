@@ -98,7 +98,8 @@ def omr_to_musicxml(input_path: Path, output_path: Path) -> Path:
         "Converta a(s) imagem(ns) de partitura para MusicXML no formato score-partwise. "
         "Regras: retornar APENAS o XML (sem markdown, sem explicações). "
         "Incluir todas as páginas fornecidas como uma única partitura. "
-        "Se houver múltiplas vozes/partes, preserve-as."
+        "Se houver múltiplas vozes/partes, preserve-as. "
+        "Priorize duração e altura corretas das notas, pausas e compassos."
     )
 
     content: list[dict] = [{"type": "text", "text": prompt}]
@@ -139,8 +140,27 @@ def omr_to_musicxml(input_path: Path, output_path: Path) -> Path:
 
     try:
         converter.parseData(xml)
-    except Exception as e:
-        raise ValueError("OCR/OMR retornou MusicXML inválido para parsing") from e
+    except Exception:
+        logger.warning("OCR/OMR retornou XML inválido, tentando reparo com LLM")
+        repair_prompt = (
+            "Repare o MusicXML abaixo para ficar válido em score-partwise. "
+            "Retorne apenas XML válido, sem markdown.\n\n"
+            f"{xml}"
+        )
+        try:
+            repaired = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": repair_prompt}],
+            )
+            repaired_text = ""
+            for choice in repaired.choices or []:
+                if choice.message and choice.message.content:
+                    repaired_text = choice.message.content
+                    break
+            xml = _sanitize_musicxml(repaired_text)
+            converter.parseData(xml)
+        except Exception as e:
+            raise ValueError("OCR/OMR retornou MusicXML inválido para parsing") from e
 
     output_path.write_text(xml, encoding="utf-8")
     return output_path
