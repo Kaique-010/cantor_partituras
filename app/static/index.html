@@ -404,7 +404,7 @@
         <div class="cardHeader">
           <h3>Partitura</h3>
           <div class="segmented" role="tablist" aria-label="Modo de visualização">
-            <button id="modeFileBtn" class="active" type="button" onclick="setViewMode('file')">Arquivo</button>
+            <button id="modeFileBtn" class="active" type="button" onclick="setViewMode('file')">Partitura</button>
             <button id="modeFullBtn" type="button" onclick="setViewMode('full')">Completa</button>
             <button id="modeVoiceBtn" type="button" onclick="setViewMode('voice')">Voz</button>
           </div>
@@ -449,7 +449,7 @@
               <button id="analyzeBtn" class="btn" type="button" onclick="analyzeScore()" disabled>Analisar
                 vozes</button>
               <button id="playNotesBtn" class="btn" type="button" onclick="playNotes()" disabled>Tocar notas</button>
-              <button id="singBtn" class="btn" type="button" onclick="singVoice()" disabled>Gerar voz (TTS)</button>
+              <button id="singBtn" class="btn" type="button" onclick="singVoice()" disabled>Gerar voz</button>
             </div>
 
             <div class="field">
@@ -662,16 +662,14 @@
         ? 'Carregando voz…'
         : (viewMode === 'full'
           ? (isPdfOrImage ? 'Convertendo via OCR/OMR (pode demorar)…' : 'Carregando partitura…')
-          : 'Carregando arquivo…');
+          : 'Carregando partitura…');
       setBusy(true, busyText);
       try {
         if (viewMode === 'file') {
-          document.getElementById('osmd').style.display = 'none';
-          document.getElementById('osmdEmpty').style.display = 'none';
-          const iframe = document.getElementById('filePreview');
-          iframe.style.display = 'block';
-          iframe.src = `/api/scores/${scoreId}/upload?v=${Date.now()}`;
-          log('INFO', 'Exibindo arquivo enviado');
+          const xmlText = await fetchMusicXmlWithPolling(`/api/scores/${scoreId}/musicxml`);
+          await renderMusicXML(xmlText);
+          timeline = null;
+          log('INFO', 'Exibindo partitura normalizada');
           return;
         }
 
@@ -896,7 +894,7 @@
       try {
         setStatus('Gerando áudio…');
         setBusy(true, 'Gerando áudio…');
-        const data = await fetchJson(`/api/scores/${scoreId}/sing`, {
+        const data = await fetchJson(`/api/scores/${scoreId}/play-synth`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ voice }),
@@ -913,7 +911,8 @@
 
         await audioEl.play();
         setStatus('Tocando');
-        log('INFO', `Áudio gerado: ${JSON.stringify(data)}`);
+        const mode = data.mode || 'synth';
+        log('INFO', `Áudio gerado (${mode}): ${JSON.stringify(data)}`);
       } catch (e) {
         setStatus('Erro no áudio', 'err');
         log('ERRO', `Erro ao gerar áudio: ${e.message}`);

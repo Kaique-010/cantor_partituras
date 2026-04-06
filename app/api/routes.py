@@ -11,6 +11,7 @@ from starlette.responses import Response
 from app.agents.orchestrator import ScoreAgents
 from app.schemas import (
     AnalyzeResponse,
+    PartListResponse,
     SingRequest,
     SingResponse,
     VoiceListResponse,
@@ -20,8 +21,8 @@ from app.schemas import (
 from app.services.musicxml import (
     build_voice_note_events,
     build_voice_timeline,
+    analyze_parts,
     export_voice_musicxml,
-    extract_voice_notes_description,
     build_voice_sing_script,
     infer_satb_voices,
     normalize_to_musicxml,
@@ -30,9 +31,12 @@ from app.services.storage import (
     parsed_musicxml_path,
     persist_upload,
     voice_audio_path,
+    voice_midi_path,
     voice_musicxml_path,
+    voice_wav_path,
 )
 from app.services.tts import synthesize_voice
+from app.services.synth_renderer import render_voice_audio
 
 router = APIRouter(prefix="/api/scores", tags=["scores"])
 agents = ScoreAgents()
@@ -80,7 +84,11 @@ def get_uploaded_file(score_id: str) -> FileResponse:
     elif suffix in (".mid", ".midi"):
         media_type = "audio/midi"
 
-    return FileResponse(path, media_type=media_type, filename=path.name)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Content-Disposition": "inline"},
+    )
 
 
 def _convert_to_musicxml_job(score_id: str) -> None:
@@ -133,12 +141,16 @@ def ensure_analyzed(score_id: str) -> dict:
         raise HTTPException(status_code=400, detail=str(e)) from e
     score["voices"] = result.voices
     score["normalized_musicxml_path"] = str(result.normalized_musicxml)
+    score["parts"] = analyze_parts(Path(score["normalized_musicxml_path"]))
     return score
 
 
 @router.post("/{score_id}/analyze", response_model=AnalyzeResponse)
 def analyze_score(score_id: str) -> AnalyzeResponse:
     score = ensure_analyzed(score_id)
+    normalized_path = Path(score["normalized_musicxml_path"])
+    score["parts"] = analyze_parts(normalized_path)
+    score["voices"] = sorted({p["guessed_voice"] for p in score["parts"]}) or infer_satb_voices(normalized_path)
 
     return AnalyzeResponse(
         score_id=score_id,
@@ -153,6 +165,15 @@ def list_voices(score_id: str) -> VoiceListResponse:
 
     voices = score.get("voices") or []
     return VoiceListResponse(score_id=score_id, voices=voices)
+
+
+@router.get("/{score_id}/parts", response_model=PartListResponse)
+def list_parts(score_id: str) -> PartListResponse:
+    score = ensure_analyzed(score_id)
+    normalized_path = Path(score["normalized_musicxml_path"])
+    parts = analyze_parts(normalized_path)
+    score["parts"] = parts
+    return PartListResponse(score_id=score_id, parts=parts)
 
 @router.get("/{score_id}/musicxml")
 def get_musicxml(score_id: str, background_tasks: BackgroundTasks) -> Response:
@@ -258,7 +279,13 @@ def get_voice_events(score_id: str, voice: str) -> VoiceNoteEventsResponse:
 
     normalized_path = Path(score["normalized_musicxml_path"])
     data = build_voice_note_events(normalized_path, voice)
-    return VoiceNoteEventsResponse(score_id=score_id, voice=voice, bpm=data["bpm"], events=data["events"])
+    return VoiceNoteEventsResponse(
+        score_id=score_id,
+        voice=voice,
+        bpm=data["bpm"],
+        tempo_changes=data.get("tempo_changes", []),
+        events=data["events"],
+    )
 
 
 @router.get("/{score_id}/voices/{voice}/audio")
@@ -276,13 +303,44 @@ def get_voice_audio(score_id: str, voice: str) -> FileResponse:
 
 @router.post("/{score_id}/sing", response_model=SingResponse)
 def sing_voice(score_id: str, payload: SingRequest) -> SingResponse:
+    return sing_voice_tts(score_id, payload)
+
+
+@router.post("/{score_id}/play-synth", response_model=SingResponse)
+def play_synth(score_id: str, payload: SingRequest) -> SingResponse:
     score = ensure_analyzed(score_id)
 
     if payload.voice not in (score.get("voices") or []):
         raise HTTPException(status_code=400, detail="Voz não disponível para esta partitura")
 
     output = voice_audio_path(score_id, payload.voice)
+    output_midi = voice_midi_path(score_id, payload.voice)
+    output_wav = voice_wav_path(score_id, payload.voice)
+    normalized_path = Path(score["normalized_musicxml_path"])
+    try:
+        render_voice_audio(normalized_path, payload.voice, output, output_midi=output_midi, output_wav=output_wav)
+    except ValueError as e:
+        # fallback automático para TTS experimental quando synth não estiver disponível no ambiente
+        bpm, sing_script = build_voice_sing_script(normalized_path, payload.voice)
+        try:
+            synthesize_voice(payload.voice, f"bpm={int(bpm)}; seq={sing_script}", output)
+            audio_url = f"/api/scores/{score_id}/voices/{payload.voice}/audio"
+            return SingResponse(score_id=score_id, voice=payload.voice, audio_url=audio_url, mode="tts")
+        except ValueError:
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
+    audio_url = f"/api/scores/{score_id}/voices/{payload.voice}/audio"
+    return SingResponse(score_id=score_id, voice=payload.voice, audio_url=audio_url, mode="synth")
+
+
+@router.post("/{score_id}/sing-tts", response_model=SingResponse)
+def sing_voice_tts(score_id: str, payload: SingRequest) -> SingResponse:
+    score = ensure_analyzed(score_id)
+
+    if payload.voice not in (score.get("voices") or []):
+        raise HTTPException(status_code=400, detail="Voz não disponível para esta partitura")
+
+    output = voice_audio_path(score_id, payload.voice)
     normalized_path = Path(score["normalized_musicxml_path"])
     bpm, sing_script = build_voice_sing_script(normalized_path, payload.voice)
     try:
@@ -291,4 +349,4 @@ def sing_voice(score_id: str, payload: SingRequest) -> SingResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     audio_url = f"/api/scores/{score_id}/voices/{payload.voice}/audio"
-    return SingResponse(score_id=score_id, voice=payload.voice, audio_url=audio_url)
+    return SingResponse(score_id=score_id, voice=payload.voice, audio_url=audio_url, mode="tts")
